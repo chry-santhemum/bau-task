@@ -1,0 +1,15 @@
+correct: 11
+total: 32
+
+<pad><pad><pad><pad><pad><pad><pad><bos><start_of_turn>user
+Count the number of words in the following list that match the given type.
+Type: country
+List: Canada cat China Australia Mexico UK India USA
+Only output the final answer.<end_of_turn>
+<start_of_turn>model
+7 
+<end_of_turn>
+
+intended answer: 7
+extracted answer: 7
+--------------------------------

@@ -1,0 +1,7 @@
+{
+  "google/gemma-2-2b-it": {
+    "accuracy": 0.32,
+    "correct": 16,
+    "total": 50
+  }
+}

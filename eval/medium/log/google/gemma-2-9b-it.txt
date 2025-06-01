@@ -1,0 +1,14 @@
+correct: 21
+total: 32
+
+<pad><pad><pad><pad><pad><bos><start_of_turn>user
+Count the number of words in the following list that match the given type.
+Type: geometric shape
+List: circle hexagon rectangle Germany triangle
+Only output the final answer.<end_of_turn>
+<start_of_turn>model
+5<end_of_turn><eos>
+
+intended answer: 4
+extracted answer: 5
+--------------------------------

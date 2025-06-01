@@ -1,0 +1,15 @@
+correct: 19
+total: 32
+
+<pad><pad><pad><pad><pad><pad><bos><start_of_turn>user
+Count the number of words in the following list that match the given type.
+Type: weather
+List: sunshine snow dolphin Australia
+Only output the final answer.<end_of_turn>
+<start_of_turn>model
+1
+<end_of_turn>
+
+intended answer: 2
+extracted answer: 1
+--------------------------------
