@@ -30,7 +30,7 @@ TYPES = {
 random.seed(142857)
 
 
-def craft_question(num_total_items: int, min_target_num: int=1) -> tuple[str, list[str], list[int], int]:
+def craft_question(num_total_items: int, target_num: int | None = None) -> tuple[str, list[str], list[int], int]:
     """
     Returns information needed to build a random prompt.
     """
@@ -38,7 +38,10 @@ def craft_question(num_total_items: int, min_target_num: int=1) -> tuple[str, li
 
     # select target type
     target_items = TYPES[target_type]
-    target_num = random.randint(min_target_num, min(len(target_items), num_total_items - 1))
+    if target_num is None:
+        target_num = random.randint(1, min(len(target_items), num_total_items))
+    assert target_num > 0 and target_num <= len(target_items)
+        
     selected = random.sample(target_items, target_num)
     remaining_slots = num_total_items - target_num
 
