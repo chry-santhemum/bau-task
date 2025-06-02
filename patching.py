@@ -6,7 +6,7 @@ from transformer_lens.hook_points import HookPoint
 from transformers import AutoTokenizer
 import pandas as pd
 import plotly.express as px
-from data import TYPES_SIMPLE, make_prompt
+from data import make_prompt
 from benchmarking import add_generation_prompt
 
 from functools import partial
@@ -15,6 +15,13 @@ from transformer_lens.patching import generic_activation_patch, layer_pos_patch_
 # %%
 device = "cuda" if torch.cuda.is_available() else "cpu"
 random.seed(142857)
+
+TYPES_SIMPLE = {
+    "fruit": ["apple", "banana", "strawberry", "pear", "grape", "watermelon", "pineapple", "mango", "blueberry", "peach"],
+    "animal": ["dog", "cat", "lion", "elephant", "giraffe", "monkey", "penguin", "dolphin", "tiger", "bear"],
+    "sport": ["soccer", "basketball", "tennis", "baseball", "swimming", "volleyball", "golf", "skiing", "cricket", "hockey"],
+    "country": ["USA", "Canada", "Mexico", "Brazil", "UK", "France", "Germany", "China", "India", "Australia"],
+}
 
 # %%
 # model loading takes a while
@@ -141,8 +148,6 @@ def items_list_patching(
     source_tokens = model.to_tokens(source_prompts, prepend_bos=False)
     target_tokens = model.to_tokens(target_prompts, prepend_bos=False)
 
-    print(source_tokens.shape, target_tokens.shape)
-
     # start patching from start_pos
     start_pos_tok = tokenizer.encode("List", add_special_tokens=False)[0]
     end_pos_tok = tokenizer.encode("Only", add_special_tokens=False)[0]
@@ -210,64 +215,25 @@ def make_item_list_pair(
         
     return source_list, target_list, type_name
 
-
-# %%
-# Suppose that there is a layer which stores a running count for the number of items, and the model then uses this to generate the final answer.
-# Then, 
-
-type_name = "fruit"
-source_list = ["cat", "apple", "grape", "triangle", "baseball", "watermelon"]
-target_list = ["cat", "apple", "orange", "triangle", "baseball", "watermelon"]
-print(source_list)
-print(target_list)
-
 # %%
 
-original_ans = 4
-patched_expect = 3
-act_name = "resid_pre"
-metric = make_logit_diff_metric(patched_expect, original_ans)
-print(f"metric: P[{original_ans}] - P[{patched_expect}]")
-
-patching_results, labels = items_list_patching(
-    source_list,
-    target_list,
-    type_name,
-    model,
-    tokenizer,
-    act_name=act_name,
-    metric=metric,
-    end_layer=30,
-)
-
-print("Source:", source_list)
-print("Target:", target_list)
-fig = px.imshow(
-    patching_results.view(31, -1).cpu().numpy(),
-    color_continuous_scale="RdBu", 
-    x=labels,
-    zmin=-1, zmax=1,
-    height=700, width=500,
-) 
-fig.update_xaxes(tickangle=45)
-fig.show()
-
-# %%
-
-source_running = [0, 1, 1, 2, 2]
-target_running = [0, 0, 1, 1, 2]
+source_running = [1, 1, 2, 2, 3, 3, 4, 4]
+target_running = [0, 1, 1, 2, 2, 3, 3, 4]
 
 source_lists = []
 target_lists = []
 type_names = []
 
-for i in range(5):
-    source_list, target_list, type_name = make_item_list_pair(source_running, target_running)
+for i in range(10):
+    source_list, target_list, type_name = make_item_list_pair(source_running, target_running, type_name="country")
+    print("Source:", source_list)
+    print("Target:", target_list)
+    print("Type:", type_name)
     # source_lists.append(source_list)
     # target_lists.append(target_list)
     # type_names.append(type_name)
 
-    original_ans = 2
+    original_ans = 4
     patched_expect = 3
     act_name = "resid_pre"
     metric = make_logit_diff_metric(patched_expect, original_ans)
@@ -294,19 +260,7 @@ for i in range(5):
     fig.update_xaxes(tickangle=45)
     fig.show()
 
-# %%
-
-fig.write_image(f"patching_vis/{''.join([str(i) for i in source_running])}->{''.join([str(i) for i in target_running])}_{act_name}_{original_ans}_{patched_expect}.png")
+    fig.write_image(f"patching_vis/results/{''.join([str(i) for i in source_running])}->{''.join([str(i) for i in target_running])}_{act_name}_{original_ans}_{patched_expect}_run_{i}.png")
 
 
 # %%
-
-if __name__ == "__main__":
-    model_name = "google/gemma-2-9b"
-    model = HookedTransformer.from_pretrained_no_processing(
-        model_name,
-        torch_dtype=torch.bfloat16,
-        device=device,
-    )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-

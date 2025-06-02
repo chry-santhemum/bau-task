@@ -4,14 +4,6 @@ from concurrent.futures import ProcessPoolExecutor
 import math
 from functools import partial
 
-TYPES_SIMPLE = {
-    "fruit": ["apple", "banana", "strawberry", "pear", "grape", "watermelon", "pineapple", "mango", "blueberry", "peach"],
-    "animal": ["dog", "cat", "lion", "elephant", "giraffe", "monkey", "penguin", "dolphin", "tiger", "bear"],
-    "tree": ["oak", "ginkgo", "pine", "birch", "willow", "redwood", "fir", "spruce", "palm", "sequoia"],
-    "sport": ["soccer", "basketball", "tennis", "baseball", "swimming", "volleyball", "golf", "skiing", "cricket", "hockey"],
-    "country": ["USA", "Canada", "Mexico", "Brazil", "UK", "France", "Germany", "China", "India", "Australia"],
-}
-
 TYPES = {
     "fruit": ["apple", "banana", "strawberry", "pear", "grape", "watermelon", "pineapple", "mango", "blueberry", "peach"],
     "animal": ["dog", "cat", "lion", "elephant", "giraffe", "monkey", "penguin", "dolphin", "tiger", "bear"],
