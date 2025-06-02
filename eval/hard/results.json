@@ -1,0 +1,57 @@
+{
+  "google/gemma-2-2b-it": {
+    "accuracy": 0.3008,
+    "correct": 1504,
+    "total": 5000
+  },
+  "google/gemma-2-9b-it": {
+    "accuracy": 0.5466,
+    "correct": 2733,
+    "total": 5000
+  },
+  "google/gemma-2-27b-it": {
+    "accuracy": 0.5864,
+    "correct": 2932,
+    "total": 5000
+  },
+  "google/gemma-3-4b-it": {
+    "accuracy": 0.292,
+    "correct": 1460,
+    "total": 5000
+  },
+  "google/gemma-3-12b-it": {
+    "accuracy": 0.6392,
+    "correct": 3196,
+    "total": 5000
+  },
+  "Qwen/Qwen3-8B": {
+    "accuracy": 0.216,
+    "correct": 1080,
+    "total": 5000
+  },
+  "Qwen/Qwen3-14B": {
+    "accuracy": 0.441,
+    "correct": 2205,
+    "total": 5000
+  },
+  "Qwen/Qwen2.5-1.5B-Instruct": {
+    "accuracy": 0.1668,
+    "correct": 834,
+    "total": 5000
+  },
+  "Qwen/Qwen2.5-3B-Instruct": {
+    "accuracy": 0.179,
+    "correct": 895,
+    "total": 5000
+  },
+  "Qwen/Qwen2.5-7B-Instruct": {
+    "accuracy": 0.2832,
+    "correct": 1416,
+    "total": 5000
+  },
+  "Qwen/Qwen2.5-14B-Instruct": {
+    "accuracy": 0.4056,
+    "correct": 2028,
+    "total": 5000
+  }
+}

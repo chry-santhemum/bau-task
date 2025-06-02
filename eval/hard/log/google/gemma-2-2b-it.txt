@@ -13,3 +13,63 @@ Only output the final answer.<end_of_turn>
 intended answer: 7
 extracted answer: 7
 --------------------------------
+correct: 11
+total: 32
+
+<pad><pad><pad><pad><pad><pad><pad><bos><start_of_turn>user
+Count the number of words in the following list that match the given type.
+Type: country
+List: Canada cat China Australia Mexico UK India USA
+Only output the final answer.<end_of_turn>
+<start_of_turn>model
+7 
+<end_of_turn>
+
+intended answer: 7
+extracted answer: 7
+--------------------------------
+correct: 497
+total: 1632
+
+<pad><pad><pad><pad><pad><pad><pad><pad><bos><start_of_turn>user
+Count the number of words in the following list that match the given type.
+Type: fruit
+List: strawberry pineapple Brazil mango India lion blueberry birch pink
+Only output the final answer.<end_of_turn>
+<start_of_turn>model
+4 
+<end_of_turn><pad>
+
+intended answer: 4
+extracted answer: 4
+--------------------------------
+correct: 989
+total: 3232
+
+<pad><pad><pad><pad><pad><pad><bos><start_of_turn>user
+Count the number of words in the following list that match the given type.
+Type: color
+List: brown orange white lung banana skiing elephant purple Germany
+Only output the final answer.<end_of_turn>
+<start_of_turn>model
+3 
+<end_of_turn>
+
+intended answer: 4
+extracted answer: 3
+--------------------------------
+correct: 1452
+total: 4832
+
+<pad><pad><pad><bos><start_of_turn>user
+Count the number of words in the following list that match the given type.
+Type: geometric shape
+List: wind oval cricket cylinder birch UK sadness dog India
+Only output the final answer.<end_of_turn>
+<start_of_turn>model
+1 
+<end_of_turn><pad>
+
+intended answer: 2
+extracted answer: 1
+--------------------------------
