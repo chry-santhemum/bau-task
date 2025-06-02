@@ -6,7 +6,7 @@ from transformer_lens.hook_points import HookPoint
 from transformers import AutoTokenizer
 import pandas as pd
 import plotly.express as px
-from data import craft_question, TYPES, make_prompt
+from data import craft_question, TYPES_SIMPLE, make_prompt
 from benchmarking import add_generation_prompt
 
 from functools import partial
@@ -27,8 +27,8 @@ model = HookedTransformer.from_pretrained_no_processing(
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # %%
-# check tokenization of all words in TYPES
-for type_name, words in TYPES.items():
+# check tokenization of all words
+for type_name, words in TYPES_SIMPLE.items():
     for word in words:
         word_tok = model.to_tokens(word, prepend_bos=False)
         if len(word_tok) > 1:
@@ -112,39 +112,31 @@ def custom_patching(
 # %%
 
 def items_list_patching(
-    source_item_list: list[str],
-    target_item_list: list[str],
+    source_list: list[str],
+    target_list: list[str],
     target_type: str,
     model: HookedTransformer,
     tokenizer: AutoTokenizer,
     act_name: str,
+    metric,
+    **kwargs,
 ):
-    source_ans, target_ans = 0, 0
-
-    for item in source_item_list:
-        if item in TYPES[target_type]:
-            source_ans += 1
-
-    for item in target_item_list:
-        if item in TYPES[target_type]:
-            target_ans += 1
-
-    print(f"source_ans: {source_ans}, target_ans: {target_ans}")
-    source_prompt = add_generation_prompt(make_prompt(target_type, source_item_list, instruct=True), tokenizer, model_thinks=False)
-    target_prompt = add_generation_prompt(make_prompt(target_type, target_item_list, instruct=True), tokenizer, model_thinks=False)
+    source_prompt = add_generation_prompt(make_prompt(target_type, source_list, instruct=True), tokenizer, model_thinks=False)
+    target_prompt = add_generation_prompt(make_prompt(target_type, target_list, instruct=True), tokenizer, model_thinks=False)
 
     start_pos_tok = tokenizer.encode("List", add_special_tokens=False)[0]
+    end_pos_tok = tokenizer.encode("Only", add_special_tokens=False)[0]
     source_tokens = model.to_tokens(source_prompt, prepend_bos=False)
     target_tokens = model.to_tokens(target_prompt, prepend_bos=False)
 
     # start patching from start_pos
     start_pos = target_tokens[0].cpu().tolist().index(start_pos_tok)
-    print(f"start_pos: {start_pos}")
+    end_pos = target_tokens[0].cpu().tolist().index(end_pos_tok)
+    print(f"start_pos: {start_pos}, end_pos: {end_pos}")
 
-    labels = [f"{i}_{tok}" for i, tok in enumerate(model.to_str_tokens(target_tokens)) if i >= start_pos]
+    labels = [f"{i}_{tok}" for i, tok in enumerate(model.to_str_tokens(target_tokens)) if (i >= start_pos+2 and i <= end_pos)]
 
     _, source_cache = model.run_with_cache(source_tokens, remove_batch_dim=False)
-    metric, _ = make_counting_metric(source_ans, target_ans)
 
     patching_results = custom_patching(
         model,
@@ -152,38 +144,113 @@ def items_list_patching(
         source_cache,
         metric,
         act_name=act_name,
-        start_pos=start_pos,
+        start_pos=start_pos+2,
+        end_pos=end_pos,
+        **kwargs,
     )
-
-    print("Source:", source_item_list)
-    print("Target:", target_item_list)
-    fig = px.imshow(
-        patching_results.view(model.cfg.n_layers, -1).cpu().numpy(),
-        color_continuous_scale="RdBu", 
-        x=labels
-    ) 
-    fig.update_xaxes(tickangle=45)
-    fig.show()
 
     return patching_results, labels
 
 # %%
 
-target_type = "fruit"
-source_item_list = ["cat", "dog", "apple", "grape", "triangle", "baseball"]
-target_item_list = ["cat", "apple", "dog", "grape", "triangle", "baseball"]
+# target_type = "fruit"
+# source_list = ["cat", "apple", "banana", "grape", "dog", "monkey", "oak"]
+# target_list = ["cat", "apple", "dog", "monkey", "oak", "banana", "grape"]
 
-items_list_patching(
-    source_item_list,
-    target_item_list,
+# %%
+
+def make_item_list_pair(
+    source_running: list[int],
+    target_running: list[int],
+    type_name: str | None = None
+):
+    if type_name is None:
+        type_name = random.choice(list(TYPES_SIMPLE.keys()))
+    
+    type_items = TYPES_SIMPLE[type_name]
+    random.shuffle(type_items)
+    other_items = []
+    for other_type, items in TYPES_SIMPLE.items():
+        if other_type != type_name:
+            other_items.extend(items)
+    random.shuffle(other_items)
+
+    length = len(source_running)
+    assert length == len(target_running)
+
+    # build item lists
+    source_count, target_count = 0, 0
+    source_list, target_list = [], []
+    for pos in range(length):
+        if source_running[pos] == source_count:
+            source_list.append(other_items[pos - source_count])
+        elif source_running[pos] == source_count + 1:
+            source_count += 1
+            source_list.append(type_items[source_count])
+        else:
+            raise ValueError("List of running scores for source is invalid")
+            
+        if target_running[pos] == target_count:
+            target_list.append(other_items[pos - target_count])
+        elif target_running[pos] == target_count + 1:
+            target_count += 1
+            target_list.append(type_items[target_count])
+        else:
+            raise ValueError("List of running scores for target is invalid")
+        
+    return source_list, target_list
+
+# %%
+# Suppose that there is a layer which stores a running count for the number of items, and the model then uses this to generate the final answer.
+# Then, 
+
+target_type = "fruit"
+source_running = [0, 1, 2, 2, 2, 3, 3, 4]
+target_running = [0, 1, 1, 2, 3, 3, 4, 4]
+source_list, target_list = make_item_list_pair(
+    source_running,
+    target_running,
+    type_name=target_type,
+)
+# source_list = ["cat", "apple", "grape", "triangle", "baseball", "car"]
+# target_list = ["cat", "apple", "baseball", "car", "grape", "banana"]
+print(source_list)
+print(target_list)
+
+# %%
+
+original_ans = 4
+patched_expect = 3
+act_name = "resid_pre"
+metric, _ = make_counting_metric(patched_expect, original_ans)
+print(f"metric: P[{original_ans}] - P[{patched_expect}]")
+
+patching_results, labels = items_list_patching(
+    source_list,
+    target_list,
     target_type,
     model,
     tokenizer,
-    act_name="resid_pre",
+    act_name=act_name,
+    metric=metric,
+    end_layer=30,
 )
 
-
 # %%
+
+print("Source:", source_list)
+print("Target:", target_list)
+fig = px.imshow(
+    patching_results.view(31, -1).cpu().numpy(),
+    color_continuous_scale="RdBu", 
+    x=labels,
+    zmin=-1, zmax=1,
+    height=700, width=500,
+) 
+fig.update_xaxes(tickangle=45)
+fig.show()
+fig.write_image(f"patching_vis/{''.join([str(i) for i in source_running])}->{''.join([str(i) for i in target_running])}_{act_name}_{original_ans}_{patched_expect}.png")
+
 
 # %%
 
