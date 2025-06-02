@@ -6,7 +6,7 @@ from transformer_lens.hook_points import HookPoint
 from transformers import AutoTokenizer
 import pandas as pd
 import plotly.express as px
-from data import craft_question, TYPES_SIMPLE, make_prompt
+from data import TYPES_SIMPLE, make_prompt
 from benchmarking import add_generation_prompt
 
 from functools import partial
@@ -29,6 +29,10 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 # %%
 # check tokenization of all words
 for type_name, words in TYPES_SIMPLE.items():
+    type_tok = model.to_tokens(type_name, prepend_bos=False)
+    if len(type_tok) > 1:
+        print(f"{type_name}: {type_tok}")
+
     for word in words:
         word_tok = model.to_tokens(word, prepend_bos=False)
         if len(word_tok) > 1:
@@ -36,7 +40,7 @@ for type_name, words in TYPES_SIMPLE.items():
 
 
 # %%
-def make_counting_metric(source_ans: int, target_ans: int):
+def make_logit_diff_metric(source_ans: int, target_ans: int):
     source_ans_tok_id = model.to_tokens(str(source_ans), prepend_bos=False)[0]
     target_ans_tok_id = model.to_tokens(str(target_ans), prepend_bos=False)[0]
 
@@ -47,31 +51,35 @@ def make_counting_metric(source_ans: int, target_ans: int):
         # print(f"source prob: {source_ans_prob_B.item()}, target prob: {target_ans_prob_B.item()}")
         return (target_ans_prob_B - source_ans_prob_B).mean()
     
+    return logit_diff_metric_
+
+def make_target_ans_metric(target_ans: int):
+    target_ans_tok_id = model.to_tokens(str(target_ans), prepend_bos=False)[0]
+
     def target_ans_metric_(logits):
         target_ans_prob_B = logits[:,-1].softmax(dim=-1)[:, target_ans_tok_id]
         return target_ans_prob_B.mean()
     
-    return logit_diff_metric_, target_ans_metric_
+    return target_ans_metric_
 
 
 def test_metric():
-    metric, _ = make_counting_metric(7, 4)
+    metric = make_logit_diff_metric(7, 4)
     
     prompt = "13 - 9 = "
     with torch.no_grad():
         logits = model(prompt, return_type="logits")
         print(logits.shape)
 
-    print(metric(logits))
+    print(metric(logits).item())
 
 test_metric()
 
 # %%
 
-
 def custom_patching(
     model: HookedTransformer, 
-    target_tokens,
+    target_tokens,  # can be batched
     source_cache,
     metric,
     act_name:str,
@@ -109,34 +117,42 @@ def custom_patching(
     return results
 
 
-# %%
 
 def items_list_patching(
-    source_list: list[str],
-    target_list: list[str],
-    target_type: str,
+    source_lists: list[list[str]] | list[str],  # batched
+    target_lists: list[list[str]] | list[str],  # batched
+    type_names: list[str] | str,  # batched
     model: HookedTransformer,
     tokenizer: AutoTokenizer,
     act_name: str,
     metric,
     **kwargs,
 ):
-    source_prompt = add_generation_prompt(make_prompt(target_type, source_list, instruct=True), tokenizer, model_thinks=False)
-    target_prompt = add_generation_prompt(make_prompt(target_type, target_list, instruct=True), tokenizer, model_thinks=False)
+    if isinstance(source_lists, list):
+        source_lists = [source_lists]
+    if isinstance(target_lists, list):
+        target_lists = [target_lists]
+    if isinstance(type_names, str):
+        type_names = [type_names]
 
-    start_pos_tok = tokenizer.encode("List", add_special_tokens=False)[0]
-    end_pos_tok = tokenizer.encode("Only", add_special_tokens=False)[0]
-    source_tokens = model.to_tokens(source_prompt, prepend_bos=False)
-    target_tokens = model.to_tokens(target_prompt, prepend_bos=False)
+    source_prompts = [add_generation_prompt(make_prompt(type_name, source_list, instruct=True), tokenizer, model_thinks=False) for source_list, type_name in zip(source_lists, type_names)]
+    target_prompts = [add_generation_prompt(make_prompt(type_name, target_list, instruct=True), tokenizer, model_thinks=False) for target_list, type_name in zip(target_lists, type_names)]
+
+    source_tokens = model.to_tokens(source_prompts, prepend_bos=False)
+    target_tokens = model.to_tokens(target_prompts, prepend_bos=False)
+
+    print(source_tokens.shape, target_tokens.shape)
 
     # start patching from start_pos
+    start_pos_tok = tokenizer.encode("List", add_special_tokens=False)[0]
+    end_pos_tok = tokenizer.encode("Only", add_special_tokens=False)[0]
     start_pos = target_tokens[0].cpu().tolist().index(start_pos_tok)
     end_pos = target_tokens[0].cpu().tolist().index(end_pos_tok)
     print(f"start_pos: {start_pos}, end_pos: {end_pos}")
 
-    labels = [f"{i}_{tok}" for i, tok in enumerate(model.to_str_tokens(target_tokens)) if (i >= start_pos+2 and i <= end_pos)]
+    labels = [f"{i}_{tok}" for i, tok in enumerate(model.to_str_tokens(target_tokens[0])) if (i >= start_pos+2 and i <= end_pos)]
 
-    _, source_cache = model.run_with_cache(source_tokens, remove_batch_dim=False)
+    _, source_cache = model.run_with_cache(source_tokens)
 
     patching_results = custom_patching(
         model,
@@ -150,12 +166,6 @@ def items_list_patching(
     )
 
     return patching_results, labels
-
-# %%
-
-# target_type = "fruit"
-# source_list = ["cat", "apple", "banana", "grape", "dog", "monkey", "oak"]
-# target_list = ["cat", "apple", "dog", "monkey", "oak", "banana", "grape"]
 
 # %%
 
@@ -198,22 +208,16 @@ def make_item_list_pair(
         else:
             raise ValueError("List of running scores for target is invalid")
         
-    return source_list, target_list
+    return source_list, target_list, type_name
+
 
 # %%
 # Suppose that there is a layer which stores a running count for the number of items, and the model then uses this to generate the final answer.
 # Then, 
 
-target_type = "fruit"
-source_running = [0, 1, 2, 2, 2, 3, 3, 4]
-target_running = [0, 1, 1, 2, 3, 3, 4, 4]
-source_list, target_list = make_item_list_pair(
-    source_running,
-    target_running,
-    type_name=target_type,
-)
-# source_list = ["cat", "apple", "grape", "triangle", "baseball", "car"]
-# target_list = ["cat", "apple", "baseball", "car", "grape", "banana"]
+type_name = "fruit"
+source_list = ["cat", "apple", "grape", "triangle", "baseball", "watermelon"]
+target_list = ["cat", "apple", "orange", "triangle", "baseball", "watermelon"]
 print(source_list)
 print(target_list)
 
@@ -222,21 +226,19 @@ print(target_list)
 original_ans = 4
 patched_expect = 3
 act_name = "resid_pre"
-metric, _ = make_counting_metric(patched_expect, original_ans)
+metric = make_logit_diff_metric(patched_expect, original_ans)
 print(f"metric: P[{original_ans}] - P[{patched_expect}]")
 
 patching_results, labels = items_list_patching(
     source_list,
     target_list,
-    target_type,
+    type_name,
     model,
     tokenizer,
     act_name=act_name,
     metric=metric,
     end_layer=30,
 )
-
-# %%
 
 print("Source:", source_list)
 print("Target:", target_list)
@@ -249,6 +251,51 @@ fig = px.imshow(
 ) 
 fig.update_xaxes(tickangle=45)
 fig.show()
+
+# %%
+
+source_running = [0, 1, 1, 2, 2]
+target_running = [0, 0, 1, 1, 2]
+
+source_lists = []
+target_lists = []
+type_names = []
+
+for i in range(5):
+    source_list, target_list, type_name = make_item_list_pair(source_running, target_running)
+    # source_lists.append(source_list)
+    # target_lists.append(target_list)
+    # type_names.append(type_name)
+
+    original_ans = 2
+    patched_expect = 3
+    act_name = "resid_pre"
+    metric = make_logit_diff_metric(patched_expect, original_ans)
+    print(f"metric: P[{original_ans}] - P[{patched_expect}]")
+
+    patching_results, labels = items_list_patching(
+        source_list,
+        target_list,
+        type_name,
+        model,
+        tokenizer,
+        act_name=act_name,
+        metric=metric,
+        end_layer=30,
+    )
+
+    fig = px.imshow(
+        patching_results.view(31, -1).cpu().numpy(),
+        color_continuous_scale="RdBu", 
+        x=labels,
+        zmin=-1, zmax=1,
+        height=700, width=500,
+    ) 
+    fig.update_xaxes(tickangle=45)
+    fig.show()
+
+# %%
+
 fig.write_image(f"patching_vis/{''.join([str(i) for i in source_running])}->{''.join([str(i) for i in target_running])}_{act_name}_{original_ans}_{patched_expect}.png")
 
 

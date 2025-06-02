@@ -19,6 +19,7 @@ if __name__ == "__main__":
     # If a specific model is selected, check if it's Gemma-3
     if args.model_idx is not None:
         models_temp = [
+            "google/gemma-2-9b",
             "google/gemma-2-2b-it",
             "google/gemma-2-9b-it",
             "google/gemma-2-27b-it",
@@ -43,6 +44,7 @@ import torch
 from torch.utils.data import DataLoader
 
 models = [
+    "google/gemma-2-9b",
     "google/gemma-2-2b-it",
     "google/gemma-2-9b-it",
     "google/gemma-2-27b-it",
@@ -105,7 +107,8 @@ if __name__ == "__main__":
     difficulty = args.difficulty
     assert difficulty in ["easy", "medium", "hard", "sample"]
 
-    ds = load_dataset(f"dataset/dataset_instruct_{difficulty}.jsonl")
+    ds_instruct = load_dataset(f"dataset/dataset_instruct_{difficulty}.jsonl")
+    ds_no_instruct = load_dataset(f"dataset/dataset_{difficulty}.jsonl")
 
     results = {}
     save_dir = f"eval/{difficulty}/results.json"
@@ -146,7 +149,13 @@ if __name__ == "__main__":
             print(f"Model {model_name} does not support thinking.")
             model_thinks = False
 
-        dl = DataLoader(ds, batch_size=32, collate_fn=partial(collate_fn, tokenizer=tokenizer, model_thinks=model_thinks), shuffle=False)
+        if ("gemma" in model_name) and ("it" not in model_name):
+            instruct = False
+            print(f"Model {model_name} is not instruct-tuned.")
+        else:
+            instruct = True
+
+        dl = DataLoader(ds_instruct if instruct else ds_no_instruct, batch_size=32, collate_fn=partial(collate_fn, tokenizer=tokenizer, model_thinks=model_thinks, instruct=instruct), shuffle=False)
 
 
         model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map=device)
@@ -173,7 +182,7 @@ if __name__ == "__main__":
                     correct += 1
                 total += 1
             
-            if i % 50 == 0:
+            if i % 10 == 0:
                 with open(eval_log_file, "a") as f:
                     f.write(f"correct: {correct}\n")
                     f.write(f"total: {total}\n\n")

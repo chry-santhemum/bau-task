@@ -7,8 +7,7 @@ from functools import partial
 TYPES_SIMPLE = {
     "fruit": ["apple", "banana", "strawberry", "pear", "grape", "watermelon", "pineapple", "mango", "blueberry", "peach"],
     "animal": ["dog", "cat", "lion", "elephant", "giraffe", "monkey", "penguin", "dolphin", "tiger", "bear"],
-    "tree": ["oak", "maple", "pine", "birch", "willow", "redwood", "fir", "spruce", "palm", "sequoia"],
-    "color": ["red", "blue", "green", "yellow", "purple", "black", "white", "pink", "brown", "cyan"],
+    "tree": ["oak", "ginkgo", "pine", "birch", "willow", "redwood", "fir", "spruce", "palm", "sequoia"],
     "sport": ["soccer", "basketball", "tennis", "baseball", "swimming", "volleyball", "golf", "skiing", "cricket", "hockey"],
     "country": ["USA", "Canada", "Mexico", "Brazil", "UK", "France", "Germany", "China", "India", "Australia"],
 }
@@ -97,18 +96,18 @@ def get_dataset_example(num_total_items: int, instruct=True) -> dict:
     return ex
 
 
-def get_dataset_one_worker(num_examples: int, mean_total_items: int = 7, std_total_items: int = 2):
+def get_dataset_one_worker(num_examples: int, mean_total_items: int = 7, std_total_items: int = 2, instruct=True):
     ds = []
     for _ in range(num_examples):
         # choose total number with Gaussian distribution
         num_total_items = round(random.normalvariate(mean_total_items, std_total_items))
         num_total_items = max(2, min(15, num_total_items))
-        example = get_dataset_example(num_total_items)
+        example = get_dataset_example(num_total_items, instruct=instruct)
         ds.append(example)
     return ds
 
 
-def save_dataset(num_examples: int, save_path: str, difficulty: str="medium", num_workers: int = 8):
+def save_dataset(num_examples: int, save_path: str, difficulty: str="medium", num_workers: int = 8, instruct=True):
     """
     save dataset to a jsonl file, and print out a few examples
     """
@@ -131,7 +130,7 @@ def save_dataset(num_examples: int, save_path: str, difficulty: str="medium", nu
     # generate in parallel
     ds = []
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        results = list(executor.map(partial(get_dataset_one_worker, mean_total_items=mean_total_items, std_total_items=std_total_items), chunks))
+        results = list(executor.map(partial(get_dataset_one_worker, mean_total_items=mean_total_items, std_total_items=std_total_items, instruct=instruct), chunks))
         for chunk in results:
             ds.extend(chunk)
     
@@ -147,4 +146,4 @@ def save_dataset(num_examples: int, save_path: str, difficulty: str="medium", nu
 
 
 if __name__ == "__main__":
-    save_dataset(num_examples=50, save_path="dataset/dataset_instruct_sample.jsonl", difficulty="easy", num_workers=16)
+    save_dataset(num_examples=5000, save_path="dataset/dataset_hard.jsonl", difficulty="hard", num_workers=16, instruct=False)

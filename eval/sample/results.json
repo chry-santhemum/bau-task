@@ -53,5 +53,10 @@
     "accuracy": 0.62,
     "correct": 31,
     "total": 50
+  },
+  "google/gemma-2-9b": {
+    "accuracy": 0.44,
+    "correct": 22,
+    "total": 50
   }
 }

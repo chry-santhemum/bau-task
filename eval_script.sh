@@ -2,6 +2,7 @@
 
 # Define the models array (matching the Python script)
 models=(
+    "google/gemma-2-9b"
     "google/gemma-2-2b-it"
     "google/gemma-2-9b-it"
     "google/gemma-2-27b-it"
